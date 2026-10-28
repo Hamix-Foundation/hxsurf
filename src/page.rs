@@ -258,6 +258,10 @@ fn fetch_network_content(url_string: &str) -> Result<String, String> {
         return Ok(body);
     }
 
+    if url_string.starts_with("https://") {
+        return Err(String::from("HTTPS request failed. hxsurf requires curl with TLS support for secure websites."));
+    }
+
     let without_scheme = if let Some(pos) = url_string.find("://") {
         &url_string[pos + 3..]
     } else {
@@ -270,13 +274,25 @@ fn fetch_network_content(url_string: &str) -> Result<String, String> {
         (without_scheme, "/")
     };
 
-    let (host, port) = if let Some((h, p)) = authority.split_once(':') {
+    let (host, port) = if let Some((h, p)) = authority.rsplit_once(':') {
         (h, p.parse::<u16>().unwrap_or(80))
     } else {
         (authority, 80u16)
     };
 
     fetch_socket(host, port, path)
+}
+
+fn encode_query(query: &str) -> String {
+    let mut encoded = String::with_capacity(query.len());
+    for byte in query.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{:02X}", byte));
+        }
+    }
+    encoded
 }
 
 pub fn parse_html(html: &str, base_url: &str) -> (String, Vec<PageNode>) {
@@ -490,7 +506,7 @@ pub fn load_page(url: &str) -> Page {
             status: String::from("Ready"),
             nodes: vec![
                 PageNode::Heading(1, String::from("hxsurf")),
-                PageNode::Paragraph(String::from("Fast and lightweight native web browser for HamixOS, built on the NetSurf layout engine and hxtoolkit.")),
+                PageNode::Paragraph(String::from("A lightweight web browser for HamixOS. Enter a web address or search the web from the address bar.")),
                 PageNode::Divider,
                 PageNode::Heading(2, String::from("Quick Navigation")),
                 PageNode::Link {
@@ -585,7 +601,7 @@ pub fn load_page(url: &str) -> Page {
     } else if trimmed.contains('.') && !trimmed.contains(' ') {
         format!("https://{}", trimmed)
     } else {
-        format!("https://html.duckduckgo.com/html/?q={}", trimmed)
+        format!("https://html.duckduckgo.com/html/?q={}", encode_query(trimmed))
     };
 
     match fetch_network_content(&url_string) {
@@ -600,19 +616,6 @@ pub fn load_page(url: &str) -> Page {
             }
         }
         Err(err) => {
-            if url_string.starts_with("https://") {
-                let http_fallback = format!("http://{}", &url_string[8..]);
-                if let Ok(body) = fetch_network_content(&http_fallback) {
-                    let (title, nodes) = parse_html(&body, &http_fallback);
-                    return Page {
-                        url: http_fallback,
-                        title,
-                        state: PageState::Loaded,
-                        nodes,
-                        status: format!("Loaded {} bytes (HTTP)", body.len()),
-                    };
-                }
-            }
             Page {
                 url: url_string,
                 title: String::from("Network Error"),

@@ -39,6 +39,7 @@ struct BrowserApp {
     bookmarks: BookmarkStore,
     url_input: String,
     status: (String, Tone),
+    dark: bool,
 }
 
 impl BrowserApp {
@@ -53,6 +54,7 @@ impl BrowserApp {
             bookmarks,
             url_input: initial_url,
             status,
+            dark: false,
         }
     }
 }
@@ -144,13 +146,22 @@ impl App for BrowserApp {
         }
     }
 
+    fn appearance(&mut self, dark: bool) {
+        self.dark = dark;
+    }
+
     fn view(&self) -> Element<Msg> {
+        let (chrome_bg, chrome_border, tab_active, tab_idle, chrome_text, chrome_muted) = if self.dark {
+            (0x1c212b, 0x394150, 0x303846, 0x242a35, 0xe5e9f0, 0xa7b0bf)
+        } else {
+            (0xf1f3f6, 0xd4d9e1, 0xffffff, 0xe5e9ef, 0x273244, 0x697586)
+        };
         let active_tab_index = self.tabs.active_index();
         let mut tab_buttons: Vec<Element<Msg>> = Vec::new();
         for (i, tab) in self.tabs.tabs().iter().enumerate() {
             let is_active = i == active_tab_index;
             let display_title = if tab.title().len() > 18 {
-                let mut s = String::from(&tab.title()[..18]);
+                let mut s: String = tab.title().chars().take(18).collect();
                 s.push('…');
                 s
             } else {
@@ -159,12 +170,12 @@ impl App for BrowserApp {
 
             if is_active {
                 let active_item = container(row(vec![
-                    text(display_title).strong().color(0x0f172a).into(),
+                    text(display_title).strong().color(chrome_text).into(),
                     hspace(6).into(),
                     button("×").flat().size(TextSize::Small).on_press(Msg::CloseTab(i)).into(),
                 ]))
-                .bg(0xffffff)
-                .border(0xcfd7e3, 1)
+                .bg(tab_active)
+                .border(chrome_border, 1)
                 .radius(6)
                 .padding(Padding::symmetric(6, 12));
                 tab_buttons.push(active_item.into());
@@ -177,7 +188,7 @@ impl App for BrowserApp {
                     inactive_row.push(button("×").flat().size(TextSize::Small).on_press(Msg::CloseTab(i)).into());
                 }
                 let inactive_item = container(row(inactive_row))
-                .bg(0xe2e8f0)
+                .bg(tab_idle)
                 .radius(6)
                 .padding(Padding::symmetric(4, 8));
                 tab_buttons.push(inactive_item.into());
@@ -189,19 +200,19 @@ impl App for BrowserApp {
 
         let active_tab = self.tabs.active_tab();
         let nav_bar = row(vec![
-            button("◀")
+            button("Back")
                 .flat()
                 .on_press_maybe(if active_tab.history.can_go_back() { Some(Msg::GoBack) } else { None })
                 .into(),
             hspace(2).into(),
-            button("▶")
+            button("Forward")
                 .flat()
                 .on_press_maybe(if active_tab.history.can_go_forward() { Some(Msg::GoForward) } else { None })
                 .into(),
             hspace(2).into(),
-            button("⟳").flat().on_press(Msg::Reload).into(),
+            button("Reload").flat().on_press(Msg::Reload).into(),
             hspace(2).into(),
-            button("⌂").flat().on_press(Msg::Home).into(),
+            button("Home").flat().on_press(Msg::Home).into(),
             hspace(8).into(),
             input(&self.url_input, "Search DuckDuckGo or enter URL...", Msg::UrlChanged)
                 .on_submit(Msg::Navigate(self.url_input.clone()))
@@ -214,7 +225,7 @@ impl App for BrowserApp {
         ]);
 
         let mut bm_buttons: Vec<Element<Msg>> = Vec::new();
-        bm_buttons.push(text("Bookmarks:").small().dim().into());
+        bm_buttons.push(text("Bookmarks").small().color(chrome_muted).into());
         bm_buttons.push(hspace(6).into());
         for bm in self.bookmarks.list().iter().take(8) {
             bm_buttons.push(
@@ -355,17 +366,20 @@ impl App for BrowserApp {
         ]);
 
         column(vec![
-            tab_bar.into(),
+            container(tab_bar).bg(chrome_bg).padding(Padding::symmetric(5, 10)).into(),
             vspace(4).into(),
-            nav_bar.into(),
+            container(nav_bar).bg(chrome_bg).padding(Padding::symmetric(7, 12)).into(),
             vspace(4).into(),
-            bookmark_bar.into(),
+            container(bookmark_bar).bg(chrome_bg).padding(Padding::symmetric(5, 14)).into(),
             vspace(6).into(),
-            divider(),
+            container(divider()).bg(chrome_bg).into(),
             content_view.into(),
             divider(),
-            vspace(4).into(),
-            status_bar.into(),
+            container(status_bar)
+                .bg(chrome_bg)
+                .border(chrome_border, 1)
+                .padding(Padding::symmetric(5, 10))
+                .into(),
         ])
         .into()
     }
