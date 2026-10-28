@@ -1,0 +1,23 @@
+[package]
+name = "hxsurf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Hamix Foundation <foundation@hamixos.org>"]
+license = "GPL-2.0-only"
+description = "Lightweight native web browser for HamixOS powered by the NetSurf engine"
+readme = "README.md"
+homepage = "https://hamixos.org"
+repository = "https://github.com/Hamix-Foundation/hxsurf"
+
+[lib]
+name = "hxsurf"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hxsurf"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("hamix"))'] }
