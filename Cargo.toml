@@ -9,15 +9,26 @@ readme = "README.md"
 homepage = "https://hamixos.org"
 repository = "https://github.com/Hamix-Foundation/hxsurf"
 
-[lib]
-name = "hxsurf"
-path = "src/lib.rs"
-
 [[bin]]
 name = "hxsurf"
 path = "src/main.rs"
 
+[lib]
+name = "hxsurf"
+path = "src/lib.rs"
+
 [dependencies]
+hxport = { path = "../../libs/hxport" }
+
+[target.'cfg(target_os = "hamix")'.dependencies]
+hxstd = { path = "../../libs/hxstd" }
+hxtoolkit = { path = "../../../crates/hxtoolkit", features = ["nook"] }
+
+[target.'cfg(not(target_os = "hamix"))'.dependencies]
+hxtoolkit = { path = "../../../crates/hxtoolkit", features = ["gtk"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("hamix"))'] }
+
+[package.metadata.hamix]
+desktop = "nook"
