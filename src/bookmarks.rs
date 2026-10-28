@@ -1,3 +1,7 @@
+use alloc::string::String;
+use alloc::vec::Vec;
+use alloc::vec;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bookmark {
     pub title: String,

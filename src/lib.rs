@@ -1,3 +1,7 @@
+#![cfg_attr(target_os = "hamix", no_std)]
+
+extern crate alloc;
+
 pub mod bookmarks;
 pub mod engine;
 pub mod history;

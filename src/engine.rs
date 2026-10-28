@@ -1,5 +1,6 @@
-use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int, c_void};
+use alloc::ffi::CString;
+use alloc::string::String;
+use core::ffi::{c_char, c_int, c_void, CStr};
 
 #[repr(C)]
 pub struct HamixWindowRaw {
@@ -77,7 +78,7 @@ impl Drop for WindowHandle {
             unsafe {
                 hamix_window_destroy(self.raw);
             }
-            self.raw = std::ptr::null_mut();
+            self.raw = core::ptr::null_mut();
         }
     }
 }
@@ -88,7 +89,7 @@ pub struct Engine {
 
 impl Engine {
     pub fn new() -> Result<Self, &'static str> {
-        let ret = unsafe { hamix_init(std::ptr::null()) };
+        let ret = unsafe { hamix_init(core::ptr::null()) };
         if ret == 0 {
             Ok(Self { initialized: true })
         } else {
@@ -100,7 +101,7 @@ impl Engine {
         if !self.initialized {
             return Err("engine is not initialized");
         }
-        let raw = unsafe { hamix_window_create(width as c_int, height as c_int, std::ptr::null_mut()) };
+        let raw = unsafe { hamix_window_create(width as c_int, height as c_int, core::ptr::null_mut()) };
         if raw.is_null() {
             Err("failed to create window")
         } else {
