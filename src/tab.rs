@@ -30,9 +30,31 @@ impl Tab {
 
     pub fn navigate(&mut self, url: impl Into<String>) {
         let u = url.into();
-        self.page.url = u.clone();
-        self.page.title = u.clone();
-        self.history.navigate(&u, &u);
+        self.page = Page::new(&u);
+        self.history.navigate(&u, &self.page.title);
+    }
+
+    pub fn back(&mut self) -> bool {
+        if let Some(item) = self.history.go_back().cloned() {
+            self.page = Page::new(&item.url);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn forward(&mut self) -> bool {
+        if let Some(item) = self.history.go_forward().cloned() {
+            self.page = Page::new(&item.url);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn reload(&mut self) {
+        let current_url = self.page.url.clone();
+        self.page = Page::new(&current_url);
     }
 }
 

@@ -25,15 +25,6 @@
 [submodule "libparserutils"]
 	path = libparserutils
 	url = git://git.netsurf-browser.org/libparserutils.git
-[submodule "libpencil"]
-	path = libpencil
-	url = git://git.netsurf-browser.org/libpencil.git
-[submodule "librosprite"]
-	path = librosprite
-	url = git://git.netsurf-browser.org/librosprite.git
-[submodule "librufl"]
-	path = librufl
-	url = git://git.netsurf-browser.org/librufl.git
 [submodule "libsvgtiny"]
 	path = libsvgtiny
 	url = git://git.netsurf-browser.org/libsvgtiny.git

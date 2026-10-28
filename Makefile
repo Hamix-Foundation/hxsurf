@@ -29,64 +29,29 @@ NETSURF_TARG := netsurf
 NSGENBIND_TARG := nsgenbind
 
 # Library targets
-NSLIB_ALL_TARG := buildsystem libnslog libwapcaplet libparserutils libcss libhubbub libdom libnsbmp libnsgif librosprite libnsutils libutf8proc libnspsl
+NSLIB_ALL_TARG := buildsystem libnslog libwapcaplet libparserutils libcss libhubbub libdom libnsbmp libnsgif libnsutils libutf8proc libnspsl
 
 NSLIB_SVGTINY_TARG := libsvgtiny
 
 NSLIB_FB_TARG := libnsfb
 
-NSLIB_RO_TARG := librufl libpencil
-
-
-# Build Environment
-export TARGET ?= gtk2
+export TARGET ?= hamix
 TMP_PREFIX := $(CURDIR)/inst-$(TARGET)
 export PKG_CONFIG_PATH := $(TMP_PREFIX)/lib/pkgconfig:$(PKG_CONFIG_PATH)
 export PATH := $(PATH):$(TMP_PREFIX)/bin/
 TMP_NSSHARED := $(CURDIR)/buildsystem
 
-# The system actually doing the build
 BUILD ?= $(shell $(CC) -dumpmachine)
-# The host we are targetting
 HOST ?= $(BUILD)
 
-# build verbosity. 
-# NetSurf uses the kernel style quiet Q variable but we also need to cope with thr GNU V=1 style
 ifeq ($(V),1)
   Q:=
 else
   Q=@
 endif
 
-
-# only build what we require for the target
-ifeq ($(TARGET),riscos)
-  NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) $(NSLIB_RO_TARG)
-  NSBUILD_TARG := $(NSGENBIND_TARG)
-else
-  ifeq ($(TARGET),framebuffer)
-    NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG)  $(NSLIB_FB_TARG)
-    NSBUILD_TARG := $(NSGENBIND_TARG)
-  else
-    ifeq ($(TARGET),amiga)
-      NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG)
-      NSBUILD_TARG := $(NSGENBIND_TARG)
-    else
-      ifeq ($(TARGET),cocoa)
-        NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) 
-        NSBUILD_TARG := $(NSGENBIND_TARG)
-      else
-        ifeq ($(TARGET),atari)
-          NSLIB_TARG := $(NSLIB_ALL_TARG)
-          NSBUILD_TARG := $(NSGENBIND_TARG)
-        else
-          NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG) 
-          NSBUILD_TARG := $(NSGENBIND_TARG)
-        endif
-      endif
-    endif
-  endif
-endif
+NSLIB_TARG := $(NSLIB_ALL_TARG) $(NSLIB_SVGTINY_TARG)
+NSBUILD_TARG := $(NSGENBIND_TARG)
 
 .PHONY: build install clean checkout-release checkout-head dist dist-head
 

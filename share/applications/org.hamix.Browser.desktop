@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Web Browser
-Name[uk]=Веб-браузер
-Comment=Fast and lightweight web browser for HamixOS
-Comment[uk]=Швидкий та легкий веб-браузер для HamixOS
+Name=hxsurf
+Name[uk]=hxsurf
+Comment=hxsurf web browser
+Comment[uk]=Веб-браузер hxsurf
 Keywords=web;browser;internet;surf;hxsurf;
 Exec=/usr/bin/hxsurf %U
 Icon=web-browser

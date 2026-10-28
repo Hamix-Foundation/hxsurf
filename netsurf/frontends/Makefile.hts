@@ -114,7 +114,7 @@ else
 endif
 
 # valid values for the TARGET
-VLDTARGET := amiga atari beos framebuffer gtk monkey riscos windows hamix
+VLDTARGET := hamix
 
 # Check for valid TARGET
 ifeq ($(filter $(VLDTARGET),$(TARGET)),)

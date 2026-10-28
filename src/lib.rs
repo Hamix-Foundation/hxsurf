@@ -11,5 +11,5 @@ pub mod tab;
 pub use bookmarks::{Bookmark, BookmarkStore};
 pub use engine::{Engine, WindowHandle};
 pub use history::{HistoryItem, HistoryStore};
-pub use page::{Link, Page, PageState};
+pub use page::{Page, PageNode, PageState};
 pub use tab::{Tab, TabManager};

@@ -192,10 +192,7 @@ char *realpath(const char *path, char *resolved_path);
 #endif
 
 /* IPv6 */
-#if (defined(__amigaos4__) ||			\
-     defined(__AMIGA__) ||			\
-     defined(nsatari) ||			\
-     defined(__serenity__))
+#if defined(__serenity__)
 	#define NO_IPV6
 #endif
 
