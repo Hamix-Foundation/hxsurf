@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 #include "utils/sys_time.h"
-#include "netsurf/errors.h"
+#include "utils/errors.h"
 #include "hamix/schedule.h"
 
 struct nscallback {

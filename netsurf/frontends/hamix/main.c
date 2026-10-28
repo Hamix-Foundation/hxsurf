@@ -10,6 +10,9 @@
 #include "utils/filepath.h"
 #include "netsurf/netsurf.h"
 #include "netsurf/browser_window.h"
+#include "netsurf/misc.h"
+#include "netsurf/window.h"
+#include "desktop/gui_table.h"
 
 #include "hamix/schedule.h"
 #include "hamix/browser.h"
@@ -83,6 +86,12 @@ struct hamix_window *hamix_window_create(int width, int height, void *userdata)
 	hw->height = height > 0 ? height : 768;
 	hw->userdata = userdata;
 	hw->title = strdup("HxSurf");
+	if (browser_window_create(BW_CREATE_NONE, NULL, NULL, NULL, &hw->bw) != NSERROR_OK) {
+		free(hw->title);
+		free(hw);
+		return NULL;
+	}
+	browser_window_set_dimensions(hw->bw, hw->width, hw->height);
 
 	return hw;
 }
@@ -91,6 +100,8 @@ void hamix_window_destroy(struct hamix_window *hw)
 {
 	if (!hw)
 		return;
+	if (hw->bw)
+		browser_window_destroy(hw->bw);
 	if (hw->title)
 		free(hw->title);
 	if (hw->url)

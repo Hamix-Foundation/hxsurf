@@ -1,5 +1,3 @@
-CWARNFLAGS += -Werror
-
 CFLAGS += -std=c99 \
 	  -Dhamix -Dnshamix -g \
 	  -DHAMIX_RESPATH=\"$(NETSURF_HAMIX_RESOURCES)\"

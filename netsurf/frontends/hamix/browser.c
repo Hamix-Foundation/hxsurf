@@ -7,6 +7,7 @@
 #include "utils/nsurl.h"
 #include "netsurf/window.h"
 #include "netsurf/browser_window.h"
+#include "netsurf/types.h"
 
 #include "hamix/browser.h"
 
@@ -79,15 +80,15 @@ static nserror gui_window_invalidate_area(struct gui_window *gw,
 	return NSERROR_OK;
 }
 
-static nserror gui_window_get_scroll(struct gui_window *gw, int *sx, int *sy)
+static bool gui_window_get_scroll(struct gui_window *gw, int *sx, int *sy)
 {
 	if (!gw)
-		return NSERROR_BAD_PARAMETER;
+		return false;
 	if (sx)
 		*sx = gw->scrollx;
 	if (sy)
 		*sy = gw->scrolly;
-	return NSERROR_OK;
+	return true;
 }
 
 static nserror gui_window_set_scroll(struct gui_window *gw, const struct rect *rect)
@@ -117,14 +118,13 @@ static nserror gui_window_event(struct gui_window *gw, enum gui_window_event eve
 	return NSERROR_OK;
 }
 
-static nserror gui_window_set_title(struct gui_window *gw, const char *title)
+static void gui_window_set_title(struct gui_window *gw, const char *title)
 {
 	if (!gw)
-		return NSERROR_BAD_PARAMETER;
+		return;
 	if (gw->title)
 		free(gw->title);
 	gw->title = title ? strdup(title) : NULL;
-	return NSERROR_OK;
 }
 
 static nserror gui_window_set_url(struct gui_window *gw, nsurl *url)
@@ -137,31 +137,28 @@ static nserror gui_window_set_url(struct gui_window *gw, nsurl *url)
 	return NSERROR_OK;
 }
 
-static nserror gui_window_set_icon(struct gui_window *gw, struct hlcache_handle *icon)
+static void gui_window_set_icon(struct gui_window *gw, struct hlcache_handle *icon)
 {
 	(void)gw;
 	(void)icon;
-	return NSERROR_OK;
 }
 
-static nserror gui_window_set_status(struct gui_window *gw, const char *status)
+static void gui_window_set_status(struct gui_window *gw, const char *status)
 {
 	if (!gw)
-		return NSERROR_BAD_PARAMETER;
+		return;
 	if (gw->status)
 		free(gw->status);
 	gw->status = status ? strdup(status) : NULL;
-	return NSERROR_OK;
 }
 
-static nserror gui_window_set_pointer(struct gui_window *gw, gui_pointer_shape shape)
+static void gui_window_set_pointer(struct gui_window *gw, gui_pointer_shape shape)
 {
 	(void)gw;
 	(void)shape;
-	return NSERROR_OK;
 }
 
-static nserror gui_window_place_caret(struct gui_window *gw, int x, int y, int height,
+static void gui_window_place_caret(struct gui_window *gw, int x, int y, int height,
 				      const struct rect *clip)
 {
 	(void)gw;
@@ -169,16 +166,15 @@ static nserror gui_window_place_caret(struct gui_window *gw, int x, int y, int h
 	(void)y;
 	(void)height;
 	(void)clip;
-	return NSERROR_OK;
 }
 
-static nserror gui_window_drag_start(struct gui_window *gw, gui_drag_type type,
+static bool gui_window_drag_start(struct gui_window *gw, gui_drag_type type,
 				     const struct rect *rect)
 {
 	(void)gw;
 	(void)type;
 	(void)rect;
-	return NSERROR_OK;
+	return false;
 }
 
 static nserror gui_window_save_link(struct gui_window *gw, nsurl *url, const char *title)

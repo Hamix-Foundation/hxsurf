@@ -28,6 +28,7 @@ enum Msg {
     SelectTab(usize),
     CloseTab(usize),
     AddBookmark,
+    FocusAddress,
     OpenBookmark(String),
     Shortcuts,
     About,
@@ -40,6 +41,7 @@ struct BrowserApp {
     url_input: String,
     status: (String, Tone),
     dark: bool,
+    address_focused: bool,
 }
 
 impl BrowserApp {
@@ -55,6 +57,7 @@ impl BrowserApp {
             url_input: initial_url,
             status,
             dark: false,
+            address_focused: false,
         }
     }
 }
@@ -70,14 +73,18 @@ impl App for BrowserApp {
         match msg {
             Msg::UrlChanged(val) => {
                 self.url_input = val;
+                self.address_focused = false;
             }
             Msg::Navigate(target_url) => {
                 self.tabs.active_tab_mut().navigate(&target_url);
+                cx.reset_scroll();
                 self.url_input = self.tabs.active_tab().url().to_string();
+                self.address_focused = false;
                 self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
             }
             Msg::GoBack => {
                 if self.tabs.active_tab_mut().back() {
+                    cx.reset_scroll();
                     self.url_input = self.tabs.active_tab().url().to_string();
                     self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
                 } else {
@@ -86,6 +93,7 @@ impl App for BrowserApp {
             }
             Msg::GoForward => {
                 if self.tabs.active_tab_mut().forward() {
+                    cx.reset_scroll();
                     self.url_input = self.tabs.active_tab().url().to_string();
                     self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
                 } else {
@@ -94,10 +102,12 @@ impl App for BrowserApp {
             }
             Msg::Reload => {
                 self.tabs.active_tab_mut().reload();
+                cx.reset_scroll();
                 self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
             }
             Msg::Home => {
                 self.tabs.active_tab_mut().navigate("about:hamix");
+                cx.reset_scroll();
                 self.url_input = String::from("about:hamix");
                 self.status = (String::from("Ready"), Tone::Dim);
             }
@@ -108,11 +118,13 @@ impl App for BrowserApp {
             }
             Msg::SelectTab(idx) => {
                 self.tabs.select_tab(idx);
+                cx.reset_scroll();
                 self.url_input = self.tabs.active_tab().url().to_string();
                 self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
             }
             Msg::CloseTab(idx) => {
                 if self.tabs.close_tab(idx) {
+                    cx.reset_scroll();
                     self.url_input = self.tabs.active_tab().url().to_string();
                     self.status = (String::from("Closed tab"), Tone::Dim);
                 }
@@ -123,8 +135,12 @@ impl App for BrowserApp {
                 self.bookmarks.add(title, url);
                 self.status = (String::from("Page bookmarked"), Tone::Success);
             }
+            Msg::FocusAddress => {
+                self.address_focused = true;
+            }
             Msg::OpenBookmark(url) => {
                 self.tabs.active_tab_mut().navigate(&url);
+                cx.reset_scroll();
                 self.url_input = url;
                 self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
             }
@@ -161,7 +177,7 @@ impl App for BrowserApp {
         for (i, tab) in self.tabs.tabs().iter().enumerate() {
             let is_active = i == active_tab_index;
             let display_title = if tab.title().len() > 18 {
-                let mut s: String = tab.title().chars().take(18).collect();
+                let mut s: String = tab.title().chars().take(14).collect();
                 s.push('…');
                 s
             } else {
@@ -177,7 +193,9 @@ impl App for BrowserApp {
                 .bg(tab_active)
                 .border(chrome_border, 1)
                 .radius(6)
-                .padding(Padding::symmetric(6, 12));
+                .padding(Padding::symmetric(3, 10))
+                .width(Length::Fixed(190))
+                .height(Length::Shrink);
                 tab_buttons.push(active_item.into());
             } else {
                 let mut inactive_row = vec![
@@ -190,7 +208,9 @@ impl App for BrowserApp {
                 let inactive_item = container(row(inactive_row))
                 .bg(tab_idle)
                 .radius(6)
-                .padding(Padding::symmetric(4, 8));
+                .padding(Padding::symmetric(3, 8))
+                .width(Length::Fixed(190))
+                .height(Length::Shrink);
                 tab_buttons.push(inactive_item.into());
             }
             tab_buttons.push(hspace(4).into());
@@ -199,29 +219,37 @@ impl App for BrowserApp {
         let tab_bar = row(tab_buttons);
 
         let active_tab = self.tabs.active_tab();
+        let document_dark = self.dark && active_tab.url().starts_with("about:");
+        let (document_bg, document_text, document_heading, document_muted, document_link, code_bg, code_border) = if document_dark {
+            (0x1b1e25, 0xe8eaf0, 0xf2f4f8, 0xa0a7b4, 0x7aa2ff, 0x23272f, 0x363c48)
+        } else {
+            (0xffffff, 0x1e293b, 0x0f172a, 0x64748b, 0x2563eb, 0xf8fafc, 0xe2e8f0)
+        };
+        let mut address_field = input(&self.url_input, "Search DuckDuckGo or enter URL...", Msg::UrlChanged)
+            .on_submit(Msg::Navigate(self.url_input.clone()))
+            .width(Length::Fill);
+        if self.address_focused {
+            address_field = address_field.focused();
+        }
         let nav_bar = row(vec![
             button("Back")
                 .flat()
                 .on_press_maybe(if active_tab.history.can_go_back() { Some(Msg::GoBack) } else { None })
                 .into(),
-            hspace(2).into(),
-            button("Forward")
+            hspace(1).into(),
+            button("Next")
                 .flat()
                 .on_press_maybe(if active_tab.history.can_go_forward() { Some(Msg::GoForward) } else { None })
                 .into(),
-            hspace(2).into(),
+            hspace(1).into(),
             button("Reload").flat().on_press(Msg::Reload).into(),
-            hspace(2).into(),
-            button("Home").flat().on_press(Msg::Home).into(),
-            hspace(8).into(),
-            input(&self.url_input, "Search DuckDuckGo or enter URL...", Msg::UrlChanged)
-                .on_submit(Msg::Navigate(self.url_input.clone()))
-                .width(Length::Fill)
-                .into(),
+            hspace(1).into(),
+            hspace(4).into(),
+            address_field.into(),
             hspace(6).into(),
             button("Go").primary().on_press(Msg::Navigate(self.url_input.clone())).into(),
             hspace(4).into(),
-            button("★").flat().on_press(Msg::AddBookmark).into(),
+            button("Save").flat().on_press(Msg::AddBookmark).into(),
         ]);
 
         let mut bm_buttons: Vec<Element<Msg>> = Vec::new();
@@ -243,67 +271,73 @@ impl App for BrowserApp {
         for node in &active_tab.page.nodes {
             match node {
                 PageNode::Heading(1, h) => {
-                    page_items.push(heading(h.clone()).color(0x0f172a).font("display").into());
-                    page_items.push(vspace(14).into());
+                    page_items.push(heading(h.clone()).color(document_heading).font("display").selectable().into());
+                    page_items.push(vspace(10).into());
                 }
                 PageNode::Heading(2, h) => {
-                    page_items.push(subheading(h.clone()).color(0x1e293b).font("title").into());
-                    page_items.push(vspace(12).into());
+                    page_items.push(subheading(h.clone()).color(document_heading).font("title").selectable().into());
+                    page_items.push(vspace(8).into());
                 }
                 PageNode::Heading(3, h) => {
-                    page_items.push(text(h.clone()).strong().color(0x334155).font("strong").into());
-                    page_items.push(vspace(8).into());
-                }
-                PageNode::Heading(_, h) => {
-                    page_items.push(text(h.clone()).strong().color(0x475569).into());
+                    page_items.push(text(h.clone()).strong().color(document_text).font("strong").selectable().into());
                     page_items.push(vspace(6).into());
                 }
+                PageNode::Heading(_, h) => {
+                    page_items.push(text(h.clone()).strong().color(document_text).selectable().into());
+                    page_items.push(vspace(4).into());
+                }
                 PageNode::Paragraph(p) => {
-                    page_items.push(text(p.clone()).wrap().color(0x1e293b).fill().into());
-                    page_items.push(vspace(8).into());
+                    page_items.push(text(p.clone()).wrap().color(document_text).fill().selectable().into());
+                    page_items.push(vspace(6).into());
                 }
                 PageNode::Link { text: l_text, url: l_url } => {
                     let target = l_url.clone();
-                    page_items.push(link(l_text.clone()).text_color(0x2563eb).on_press(Msg::Navigate(target)).into());
+                    page_items.push(link(l_text.clone()).text_color(document_link).on_press(Msg::Navigate(target)).into());
                     page_items.push(vspace(6).into());
                 }
                 PageNode::Bullet(b) => {
                     let bullet_row = row(vec![
-                        text("• ").color(0x64748b).into(),
-                        text(b.clone()).wrap().color(0x334155).fill().into(),
+                        text("• ").color(document_muted).into(),
+                        text(b.clone()).wrap().color(document_text).fill().selectable().into(),
                     ]);
                     page_items.push(bullet_row.into());
                     page_items.push(vspace(4).into());
                 }
                 PageNode::Numbered(n, b) => {
                     let num_row = row(vec![
-                        text(format!("{}. ", n)).color(0x64748b).into(),
-                        text(b.clone()).wrap().color(0x334155).fill().into(),
+                        text(format!("{}. ", n)).color(document_muted).into(),
+                        text(b.clone()).wrap().color(document_text).fill().selectable().into(),
                     ]);
                     page_items.push(num_row.into());
                     page_items.push(vspace(4).into());
                 }
                 PageNode::CodeBlock(c) => {
-                    let code_box = container(text(c.clone()).mono().font("mono").color(0x0f172a))
-                        .bg(0xf8fafc)
-                        .border(0xe2e8f0, 1)
+                    let code_box = container(text(c.clone()).mono().font("mono").color(document_text).selectable())
+                        .bg(code_bg)
+                        .border(code_border, 1)
                         .radius(6)
-                        .padding(12);
+                        .padding(12)
+                        .height(Length::Shrink);
                     page_items.push(code_box.into());
                     page_items.push(vspace(10).into());
                 }
                 PageNode::Quote(q) => {
-                    let quote_box = container(text(q.clone()).wrap().color(0x475569).fill())
-                        .bg(0xf8fafc)
-                        .border(0x94a3b8, 2)
+                    let quote_box = container(text(q.clone()).wrap().color(document_text).fill().selectable())
+                        .bg(code_bg)
+                        .border(code_border, 2)
                         .radius(4)
-                        .padding(12);
+                        .padding(12)
+                        .height(Length::Shrink);
                     page_items.push(quote_box.into());
                     page_items.push(vspace(10).into());
                 }
                 PageNode::Notice { title, text: n_text, is_error } => {
-                    let (bg_col, border_col, title_col, text_col) = if *is_error {
+                    let (bg_col, border_col, title_col, text_col) = if *is_error && document_dark {
+                        (0x321f25, 0x71313a, 0xff9b9b, 0xffc5c5)
+                    } else if *is_error {
                         (0xfef2f2, 0xfecaca, 0x991b1b, 0x7f1d1d)
+                    } else if document_dark {
+                        (0x202a3a, 0x354968, 0x9fc0ff, 0xd4e2ff)
                     } else {
                         (0xeff6ff, 0xbfdbfe, 0x1e40af, 0x1e3a8a)
                     };
@@ -315,7 +349,8 @@ impl App for BrowserApp {
                     .bg(bg_col)
                     .border(border_col, 1)
                     .radius(8)
-                    .padding(14);
+                    .padding(14)
+                    .height(Length::Shrink);
                     page_items.push(notice_box.into());
                     page_items.push(vspace(12).into());
                 }
@@ -331,18 +366,15 @@ impl App for BrowserApp {
         }
 
         let page_card = column(page_items)
-            .bg(0xffffff)
-            .border(0xd6dae1, 1)
-            .radius(8)
-            .padding(Padding::symmetric(24, 32))
-            .width(Length::Fill);
+            .bg(document_bg)
+            .padding(Padding::symmetric(16, 28))
+            .width(Length::Fill)
+            .height(Length::Shrink);
 
-        let page_container = column(vec![
-            page_card.into(),
-            vspace(24).into(),
-        ])
-        .padding(Padding::symmetric(10, 16))
-        .width(Length::Fill);
+        let page_container = column(vec![page_card.into()])
+        .bg(document_bg)
+        .width(Length::Fill)
+        .height(Length::Fill);
 
         let content_view = scroll(page_container).height(Length::Fill);
 
@@ -350,11 +382,11 @@ impl App for BrowserApp {
         let is_https = active_tab.url().starts_with("https://");
         let is_local = active_tab.url().starts_with("file://") || active_tab.url().starts_with("about:");
         let sec_badge = if is_https {
-            "🔒 Secure"
+            "Secure"
         } else if is_local {
-            "📄 Local"
+            "Local"
         } else {
-            "🌐 HTTP"
+            "HTTP"
         };
 
         let status_bar = row(vec![
@@ -366,19 +398,17 @@ impl App for BrowserApp {
         ]);
 
         column(vec![
-            container(tab_bar).bg(chrome_bg).padding(Padding::symmetric(5, 10)).into(),
-            vspace(4).into(),
-            container(nav_bar).bg(chrome_bg).padding(Padding::symmetric(7, 12)).into(),
-            vspace(4).into(),
-            container(bookmark_bar).bg(chrome_bg).padding(Padding::symmetric(5, 14)).into(),
-            vspace(6).into(),
-            container(divider()).bg(chrome_bg).into(),
+            container(tab_bar).bg(chrome_bg).padding(Padding::symmetric(3, 10)).height(Length::Shrink).into(),
+            container(nav_bar).bg(chrome_bg).padding(Padding::symmetric(3, 10)).height(Length::Shrink).into(),
+            container(bookmark_bar).bg(chrome_bg).padding(Padding::symmetric(2, 12)).height(Length::Shrink).into(),
+            container(divider()).bg(chrome_bg).height(Length::Shrink).into(),
             content_view.into(),
             divider(),
             container(status_bar)
                 .bg(chrome_bg)
                 .border(chrome_border, 1)
-                .padding(Padding::symmetric(5, 10))
+                .padding(Padding::symmetric(3, 10))
+                .height(Length::Shrink)
                 .into(),
         ])
         .into()
@@ -392,6 +422,7 @@ impl App for BrowserApp {
                 Key::Char('r') | Key::Char('R') => return Some(Msg::Reload),
                 Key::Char('d') | Key::Char('D') => return Some(Msg::AddBookmark),
                 Key::Char('q') | Key::Char('Q') => return Some(Msg::Quit),
+                Key::Char('l') | Key::Char('L') => return Some(Msg::FocusAddress),
                 _ => {}
             }
         }

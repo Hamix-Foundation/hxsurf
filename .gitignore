@@ -1,4 +1,8 @@
 build/
+!libparserutils/build/
+!libparserutils/build/**
+!libhubbub/build/
+!libhubbub/build/**
 *.o
 *.a
 *.so

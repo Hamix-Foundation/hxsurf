@@ -170,18 +170,44 @@ pub fn resolve_url(base_url: &str, href: &str) -> String {
 #[cfg(target_os = "hamix")]
 fn fetch_curl(url: &str) -> Result<String, String> {
     let tmp_file = "/tmp/hxsurf_download.tmp";
+    let error_file = "/tmp/hxsurf_download.err";
     let _ = hxport::remove(tmp_file);
-    let pid = hxstd::sys::spawn("/usr/bin/curl", &["curl", "-s", "-L", "--max-time", "12", "-A", "hxsurf/0.1", "-o", tmp_file, url], 0);
+    let _ = hxport::remove(error_file);
+    let pid = hxstd::sys::spawn(
+        "/usr/bin/curl",
+        &[
+            "curl",
+            "--silent",
+            "--show-error",
+            "--fail",
+            "--location",
+            "--connect-timeout",
+            "8",
+            "--max-time",
+            "20",
+            "--user-agent",
+            "hxsurf/0.1",
+            "--stderr",
+            error_file,
+            "--output",
+            tmp_file,
+            url,
+        ],
+        0,
+    );
     if pid < 0 {
         return Err(String::from("curl process execution failed"));
     }
     let code = hxstd::sys::waitpid(pid, false);
     if code != 0 {
+        let detail = hxport::read_to_string(error_file).unwrap_or_else(|| format!("curl exited with code {}", code));
         let _ = hxport::remove(tmp_file);
-        return Err(format!("curl failed with exit code {}", code));
+        let _ = hxport::remove(error_file);
+        return Err(detail.trim().to_string());
     }
     let content = hxport::read_to_string(tmp_file).ok_or_else(|| String::from("Failed to read response file"))?;
     let _ = hxport::remove(tmp_file);
+    let _ = hxport::remove(error_file);
     if content.is_empty() {
         return Err(String::from("Empty content returned"));
     }
@@ -191,7 +217,19 @@ fn fetch_curl(url: &str) -> Result<String, String> {
 #[cfg(not(target_os = "hamix"))]
 fn fetch_curl(url: &str) -> Result<String, String> {
     let output = std::process::Command::new("curl")
-        .args(["-s", "-L", "--max-time", "12", "-A", "hxsurf/0.1", url])
+        .args([
+            "--silent",
+            "--show-error",
+            "--fail",
+            "--location",
+            "--connect-timeout",
+            "8",
+            "--max-time",
+            "20",
+            "--user-agent",
+            "hxsurf/0.1",
+            url,
+        ])
         .output()
         .map_err(|e| format!("curl execution error: {}", e))?;
     if !output.status.success() {
@@ -254,12 +292,14 @@ fn fetch_socket(host: &str, port: u16, path: &str) -> Result<String, String> {
 }
 
 fn fetch_network_content(url_string: &str) -> Result<String, String> {
-    if let Ok(body) = fetch_curl(url_string) {
-        return Ok(body);
-    }
+    let curl_result = fetch_curl(url_string);
+    let body = match curl_result {
+        Ok(body) => return Ok(body),
+        Err(err) => err,
+    };
 
     if url_string.starts_with("https://") {
-        return Err(String::from("HTTPS request failed. hxsurf requires curl with TLS support for secure websites."));
+        return Err(format!("Secure connection failed: {}", body));
     }
 
     let without_scheme = if let Some(pos) = url_string.find("://") {
