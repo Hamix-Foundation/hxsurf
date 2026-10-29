@@ -74,6 +74,25 @@ impl BrowserApp {
     }
 }
 
+fn home_tile(title: &str, detail: &str, url: &str, icon_name: &str, border: u32) -> Element<Msg> {
+    container(column(vec![
+        button(title)
+            .flat()
+            .size(TextSize::Title)
+            .icon(icon_name)
+            .on_press(Msg::Navigate(String::from(url)))
+            .into(),
+        text(detail).small().dim().wrap().into(),
+    ]))
+    .card()
+    .border(border, 1)
+    .radius(10)
+    .padding(14)
+    .width(Length::Fill)
+    .height(Length::Shrink)
+    .into()
+}
+
 impl App for BrowserApp {
     type Message = Msg;
 
@@ -222,7 +241,7 @@ impl App for BrowserApp {
                 .border(chrome_border, 1)
                 .radius(6)
                 .padding(Padding::symmetric(3, 10))
-                .width(Length::Fixed(190))
+                .width(Length::Shrink)
                 .height(Length::Shrink);
                 tab_buttons.push(active_item.into());
             } else {
@@ -237,7 +256,7 @@ impl App for BrowserApp {
                 .bg(tab_idle)
                 .radius(6)
                 .padding(Padding::symmetric(3, 8))
-                .width(Length::Fixed(190))
+                .width(Length::Shrink)
                 .height(Length::Shrink);
                 tab_buttons.push(inactive_item.into());
             }
@@ -401,10 +420,11 @@ impl App for BrowserApp {
         let page_container = column(vec![page_card.into()])
         .bg(document_bg)
         .width(Length::Fill)
-        .height(Length::Fill);
+        .height(Length::Shrink);
 
         let content_view = scroll(page_container).height(Length::Fill);
 
+        let is_home = active_tab.url() == "about:hamix" || active_tab.url() == "about:home";
         let content_view = if self.settings_open {
             let mut items = vec![
                 heading("Browser settings").into(),
@@ -429,6 +449,40 @@ impl App for BrowserApp {
                 items.push(vspace(4).into());
             }
             scroll(container(column(items).padding(24).width(Length::Fill).height(Length::Shrink)).height(Length::Fill)).height(Length::Fill)
+        } else if is_home {
+            let hero = container(column(vec![
+                heading("The web, at your pace").font("display").color(document_heading).into(),
+                vspace(6).into(),
+                text("A quiet starting point for HamixOS. Search the web, open your bookmarks, or enter an address above.")
+                    .wrap().color(document_muted).into(),
+            ]))
+            .bg(chrome_bg)
+            .radius(12)
+            .padding(Padding::symmetric(26, 30))
+            .width(Length::Fill)
+            .height(Length::Shrink);
+            let tiles = column(vec![
+                row(vec![
+                    home_tile("HamixOS documentation", "System guides and help", "file:///usr/share/doc/hamix/index.html", "ui/file", chrome_border),
+                    hspace(14).into(),
+                    home_tile("Search the web", "Find pages with DuckDuckGo", "https://html.duckduckgo.com/html/", "ui/search", chrome_border),
+                ]).into(),
+                vspace(12).into(),
+                row(vec![
+                    home_tile("NetSurf project", "The browser engine behind this project", "https://www.netsurf-browser.org/", "ui/network", chrome_border),
+                    hspace(14).into(),
+                    home_tile("HamixOS", "Visit the project portal", "https://hamixos.org", "ui/home", chrome_border),
+                ]).into(),
+            ]);
+            scroll(container(column(vec![
+                hero.into(),
+                vspace(24).into(),
+                subheading("Quick access").color(document_heading).into(),
+                vspace(10).into(),
+                tiles.into(),
+            ]).padding(Padding::symmetric(34, 48)).width(Length::Fill).height(Length::Shrink))
+                .height(Length::Shrink))
+                .height(Length::Fill)
         } else { content_view };
 
         column(vec![
