@@ -176,7 +176,6 @@ fn fetch_curl(url: &str) -> Result<String, String> {
     let pid = hxstd::sys::spawn(
         "/usr/bin/curl",
         &[
-            "curl",
             "--silent",
             "--show-error",
             "--fail",

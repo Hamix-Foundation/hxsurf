@@ -8,7 +8,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::vec;
 use hxtoolkit::{
-    button, column, container, divider, heading, hspace, input, link, row, scroll, space,
+    button, column, container, divider, heading, hspace, icon_button, input, link, row, scroll, space,
     subheading, text, vspace, App, Context, Element, Key, KeyPress, Length, MenuItem, Padding,
     Settings, TextSize, Tone,
 };
@@ -66,7 +66,7 @@ impl App for BrowserApp {
     type Message = Msg;
 
     fn title(&self) -> String {
-        format!("{} — hxsurf", self.tabs.active_tab().title())
+        format!("{} — Browser", self.tabs.active_tab().title())
     }
 
     fn update(&mut self, msg: Msg, cx: &mut Context<Msg>) {
@@ -152,8 +152,8 @@ impl App for BrowserApp {
             }
             Msg::About => {
                 cx.message(
-                    "About hxsurf",
-                    "hxsurf 0.1.0\nFast and lightweight native web browser for HamixOS, built on the NetSurf layout engine and hxtoolkit.",
+                    "About Browser",
+                    "Browser 0.1.0\nWeb browser for HamixOS.",
                 );
             }
             Msg::Quit => {
@@ -188,7 +188,7 @@ impl App for BrowserApp {
                 let active_item = container(row(vec![
                     text(display_title).strong().color(chrome_text).into(),
                     hspace(6).into(),
-                    button("×").flat().size(TextSize::Small).on_press(Msg::CloseTab(i)).into(),
+                    icon_button("ui/close", "Close tab").on_press(Msg::CloseTab(i)).into(),
                 ]))
                 .bg(tab_active)
                 .border(chrome_border, 1)
@@ -203,7 +203,7 @@ impl App for BrowserApp {
                 ];
                 if self.tabs.tabs().len() > 1 {
                     inactive_row.push(hspace(2).into());
-                    inactive_row.push(button("×").flat().size(TextSize::Small).on_press(Msg::CloseTab(i)).into());
+                    inactive_row.push(icon_button("ui/close", "Close tab").on_press(Msg::CloseTab(i)).into());
                 }
                 let inactive_item = container(row(inactive_row))
                 .bg(tab_idle)
@@ -225,35 +225,34 @@ impl App for BrowserApp {
         } else {
             (0xffffff, 0x1e293b, 0x0f172a, 0x64748b, 0x2563eb, 0xf8fafc, 0xe2e8f0)
         };
-        let mut address_field = input(&self.url_input, "Search DuckDuckGo or enter URL...", Msg::UrlChanged)
+        let mut address_field = input(&self.url_input, "Search or enter a website address", Msg::UrlChanged)
             .on_submit(Msg::Navigate(self.url_input.clone()))
             .width(Length::Fill);
         if self.address_focused {
             address_field = address_field.focused();
         }
         let nav_bar = row(vec![
-            button("Back")
-                .flat()
+            icon_button("ui/back", "Back")
                 .on_press_maybe(if active_tab.history.can_go_back() { Some(Msg::GoBack) } else { None })
                 .into(),
             hspace(1).into(),
-            button("Next")
-                .flat()
+            icon_button("ui/forward", "Forward")
                 .on_press_maybe(if active_tab.history.can_go_forward() { Some(Msg::GoForward) } else { None })
                 .into(),
             hspace(1).into(),
-            button("Reload").flat().on_press(Msg::Reload).into(),
+            icon_button("ui/refresh", "Reload page").on_press(Msg::Reload).into(),
             hspace(1).into(),
+            icon_button("ui/home", "Home").on_press(Msg::Home).into(),
             hspace(4).into(),
             address_field.into(),
             hspace(6).into(),
-            button("Go").primary().on_press(Msg::Navigate(self.url_input.clone())).into(),
+            button("Go").primary().icon("ui/forward").on_press(Msg::Navigate(self.url_input.clone())).into(),
             hspace(4).into(),
-            button("Save").flat().on_press(Msg::AddBookmark).into(),
+            icon_button("ui/save", "Bookmark this page").on_press(Msg::AddBookmark).into(),
         ]);
 
         let mut bm_buttons: Vec<Element<Msg>> = Vec::new();
-        bm_buttons.push(text("Bookmarks").small().color(chrome_muted).into());
+        bm_buttons.push(text("Favourites").small().color(chrome_muted).into());
         bm_buttons.push(hspace(6).into());
         for bm in self.bookmarks.list().iter().take(8) {
             bm_buttons.push(
@@ -394,7 +393,7 @@ impl App for BrowserApp {
             hspace(8).into(),
             text(status_text.clone()).tone(*status_tone).into(),
             space().into(),
-            text(format!("Tabs: {} | hxsurf", self.tabs.tabs().len())).tone(Tone::Dim).into(),
+            text(format!("{} tabs", self.tabs.tabs().len())).tone(Tone::Dim).into(),
         ]);
 
         column(vec![
@@ -466,7 +465,7 @@ impl App for BrowserApp {
                 "Help",
                 vec![
                     MenuItem::new("Keyboard Shortcuts", Msg::Shortcuts),
-                    MenuItem::new("About hxsurf", Msg::About),
+                    MenuItem::new("About Browser", Msg::About),
                 ],
             ),
         ]
@@ -475,7 +474,7 @@ impl App for BrowserApp {
 
 fn run() -> i32 {
     hxtoolkit::run(
-        Settings::new("hxsurf")
+        Settings::new("browser").icon("web-browser")
             .size(1024, 680)
             .min_size(540, 380),
         BrowserApp::new(),
