@@ -8,7 +8,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::vec;
 use hxtoolkit::{
-    button, column, container, divider, heading, hspace, icon_button, input, link, row, scroll, space,
+    button, column, container, divider, heading, hspace, icon_button, input, link, row, scroll,
     subheading, text, vspace, App, Context, Element, Key, KeyPress, Length, MenuItem, Padding,
     Settings, TextSize, Tone,
 };
@@ -28,6 +28,10 @@ enum Msg {
     SelectTab(usize),
     CloseTab(usize),
     AddBookmark,
+    ToggleSettings,
+    RemoveBookmark(usize),
+    HomeChanged(String),
+    SaveHome,
     FocusAddress,
     OpenBookmark(String),
     Shortcuts,
@@ -42,13 +46,19 @@ struct BrowserApp {
     status: (String, Tone),
     dark: bool,
     address_focused: bool,
+    settings_open: bool,
+    homepage: String,
 }
 
 impl BrowserApp {
     fn new() -> Self {
-        let initial_url = hxport::args().get(1).cloned().unwrap_or_else(|| String::from("about:hamix"));
+        let default_home = hxport::read_to_string(&format!("{}/.config/hxsurf/homepage", hxport::home()))
+            .filter(|value| !value.trim().is_empty()).unwrap_or_else(|| String::from("about:hamix"));
+        let initial_url = hxport::args().get(1).cloned().unwrap_or(default_home);
         let tabs = TabManager::new(&initial_url);
-        let bookmarks = BookmarkStore::new();
+        let bookmarks = BookmarkStore::load(&format!("{}/.config/hxsurf/bookmarks", hxport::home()));
+        let homepage = hxport::read_to_string(&format!("{}/.config/hxsurf/homepage", hxport::home()))
+            .filter(|value| !value.trim().is_empty()).unwrap_or_else(|| String::from("about:hamix"));
         let status = (tabs.active_tab().page.status.clone(), Tone::Dim);
 
         Self {
@@ -58,6 +68,8 @@ impl BrowserApp {
             status,
             dark: false,
             address_focused: false,
+            settings_open: false,
+            homepage,
         }
     }
 }
@@ -106,9 +118,9 @@ impl App for BrowserApp {
                 self.status = (self.tabs.active_tab().page.status.clone(), Tone::Dim);
             }
             Msg::Home => {
-                self.tabs.active_tab_mut().navigate("about:hamix");
+                self.tabs.active_tab_mut().navigate(&self.homepage);
                 cx.reset_scroll();
-                self.url_input = String::from("about:hamix");
+                self.url_input = self.homepage.clone();
                 self.status = (String::from("Ready"), Tone::Dim);
             }
             Msg::NewTab => {
@@ -133,7 +145,23 @@ impl App for BrowserApp {
                 let url = self.tabs.active_tab().url().to_string();
                 let title = self.tabs.active_tab().title().to_string();
                 self.bookmarks.add(title, url);
+                self.bookmarks.save(&format!("{}/.config/hxsurf/bookmarks", hxport::home()));
                 self.status = (String::from("Page bookmarked"), Tone::Success);
+            }
+            Msg::ToggleSettings => self.settings_open = !self.settings_open,
+            Msg::RemoveBookmark(index) => {
+                self.bookmarks.remove(index);
+                self.bookmarks.save(&format!("{}/.config/hxsurf/bookmarks", hxport::home()));
+            }
+            Msg::HomeChanged(value) => self.homepage = value,
+            Msg::SaveHome => {
+                let path = format!("{}/.config/hxsurf/homepage", hxport::home());
+                if let Some(parent) = path.rsplit_once('/') {
+                    if let Some(grandparent) = parent.0.rsplit_once('/') { let _ = hxport::mkdir(grandparent.0); }
+                    let _ = hxport::mkdir(parent.0);
+                }
+                let _ = hxport::write(&path, self.homepage.as_bytes());
+                self.settings_open = false;
             }
             Msg::FocusAddress => {
                 self.address_focused = true;
@@ -220,10 +248,10 @@ impl App for BrowserApp {
 
         let active_tab = self.tabs.active_tab();
         let document_dark = self.dark && active_tab.url().starts_with("about:");
-        let (document_bg, document_text, document_heading, document_muted, document_link, code_bg, code_border) = if document_dark {
-            (0x1b1e25, 0xe8eaf0, 0xf2f4f8, 0xa0a7b4, 0x7aa2ff, 0x23272f, 0x363c48)
+        let (document_bg, document_text, document_heading, document_muted, code_bg, code_border) = if document_dark {
+            (0x1b1e25, 0xe8eaf0, 0xf2f4f8, 0xa0a7b4, 0x23272f, 0x363c48)
         } else {
-            (0xffffff, 0x1e293b, 0x0f172a, 0x64748b, 0x2563eb, 0xf8fafc, 0xe2e8f0)
+            (0xffffff, 0x1e293b, 0x0f172a, 0x64748b, 0xf8fafc, 0xe2e8f0)
         };
         let mut address_field = input(&self.url_input, "Search or enter a website address", Msg::UrlChanged)
             .on_submit(Msg::Navigate(self.url_input.clone()))
@@ -246,13 +274,13 @@ impl App for BrowserApp {
             hspace(4).into(),
             address_field.into(),
             hspace(6).into(),
-            button("Go").primary().icon("ui/forward").on_press(Msg::Navigate(self.url_input.clone())).into(),
+            button("Go").icon("ui/forward").on_press(Msg::Navigate(self.url_input.clone())).into(),
             hspace(4).into(),
             icon_button("ui/save", "Bookmark this page").on_press(Msg::AddBookmark).into(),
         ]);
 
         let mut bm_buttons: Vec<Element<Msg>> = Vec::new();
-        bm_buttons.push(text("Favourites").small().color(chrome_muted).into());
+        bm_buttons.push(text("Bookmarks").small().color(chrome_muted).into());
         bm_buttons.push(hspace(6).into());
         for bm in self.bookmarks.list().iter().take(8) {
             bm_buttons.push(
@@ -291,7 +319,7 @@ impl App for BrowserApp {
                 }
                 PageNode::Link { text: l_text, url: l_url } => {
                     let target = l_url.clone();
-                    page_items.push(link(l_text.clone()).text_color(document_link).on_press(Msg::Navigate(target)).into());
+                    page_items.push(link(l_text.clone()).on_press(Msg::Navigate(target)).into());
                     page_items.push(vspace(6).into());
                 }
                 PageNode::Bullet(b) => {
@@ -377,24 +405,31 @@ impl App for BrowserApp {
 
         let content_view = scroll(page_container).height(Length::Fill);
 
-        let (status_text, status_tone) = &self.status;
-        let is_https = active_tab.url().starts_with("https://");
-        let is_local = active_tab.url().starts_with("file://") || active_tab.url().starts_with("about:");
-        let sec_badge = if is_https {
-            "Secure"
-        } else if is_local {
-            "Local"
-        } else {
-            "HTTP"
-        };
-
-        let status_bar = row(vec![
-            text(sec_badge).small().tone(Tone::Dim).into(),
-            hspace(8).into(),
-            text(status_text.clone()).tone(*status_tone).into(),
-            space().into(),
-            text(format!("{} tabs", self.tabs.tabs().len())).tone(Tone::Dim).into(),
-        ]);
+        let content_view = if self.settings_open {
+            let mut items = vec![
+                heading("Browser settings").into(),
+                vspace(12).into(),
+                text("Home page").strong().into(),
+                input(&self.homepage, "about:hamix or https://…", Msg::HomeChanged).on_submit(Msg::SaveHome).into(),
+                vspace(8).into(),
+                row(vec![button("Save settings").on_press(Msg::SaveHome).into(), hspace(8).into(), button("Done").on_press(Msg::ToggleSettings).into()]).into(),
+                divider(),
+                subheading("Bookmarks").into(),
+            ];
+            if self.bookmarks.list().is_empty() {
+                items.push(text("No bookmarks saved").dim().into());
+            }
+            for (index, bookmark) in self.bookmarks.list().iter().enumerate() {
+                items.push(container(row(vec![
+                    column(vec![text(bookmark.title.clone()).strong().into(), text(bookmark.url.clone()).small().dim().into()]).width(Length::Fill).into(),
+                    button("Open").on_press(Msg::OpenBookmark(bookmark.url.clone())).into(),
+                    hspace(6).into(),
+                    button("Remove").on_press(Msg::RemoveBookmark(index)).into(),
+                ])).padding(10).into());
+                items.push(vspace(4).into());
+            }
+            scroll(container(column(items).padding(24).width(Length::Fill).height(Length::Shrink)).height(Length::Fill)).height(Length::Fill)
+        } else { content_view };
 
         column(vec![
             container(tab_bar).bg(chrome_bg).padding(Padding::symmetric(3, 10)).height(Length::Shrink).into(),
@@ -402,13 +437,6 @@ impl App for BrowserApp {
             container(bookmark_bar).bg(chrome_bg).padding(Padding::symmetric(2, 12)).height(Length::Shrink).into(),
             container(divider()).bg(chrome_bg).height(Length::Shrink).into(),
             content_view.into(),
-            divider(),
-            container(status_bar)
-                .bg(chrome_bg)
-                .border(chrome_border, 1)
-                .padding(Padding::symmetric(3, 10))
-                .height(Length::Shrink)
-                .into(),
         ])
         .into()
     }
@@ -445,6 +473,7 @@ impl App for BrowserApp {
                 vec![
                     MenuItem::new("New Tab", Msg::NewTab).shortcut("Ctrl+T"),
                     MenuItem::new("Close Tab", Msg::CloseTab(self.tabs.active_index())).shortcut("Ctrl+W"),
+                    MenuItem::new("Settings and Bookmarks", Msg::ToggleSettings),
                     MenuItem::separator(),
                     MenuItem::new("Reload", Msg::Reload).shortcut("Ctrl+R"),
                     MenuItem::separator(),
@@ -461,6 +490,7 @@ impl App for BrowserApp {
                     MenuItem::new("Bookmark Current Page", Msg::AddBookmark).shortcut("Ctrl+D"),
                 ],
             ),
+            MenuItem::submenu("Bookmarks", vec![MenuItem::new("Manage Bookmarks and Settings", Msg::ToggleSettings)]),
             MenuItem::submenu(
                 "Help",
                 vec![
@@ -473,6 +503,27 @@ impl App for BrowserApp {
 }
 
 fn run() -> i32 {
+    let args = hxport::args();
+    if args.get(1).map(String::as_str) == Some("--diagnose") {
+        let Some(url) = args.get(2) else {
+            hxport::stdout("FAIL Browser diagnostic needs a URL\n");
+            return 2;
+        };
+        return match hxsurf::page::fetch_network_content(url) {
+            Ok(content) if !content.trim().is_empty() => {
+                hxport::stdout(&format!("PASS Browser fetched {}\n", url));
+                0
+            }
+            Ok(_) => {
+                hxport::stdout("FAIL Browser received an empty response\n");
+                1
+            }
+            Err(error) => {
+                hxport::stdout(&format!("FAIL Browser fetch: {}\n", error));
+                1
+            }
+        };
+    }
     hxtoolkit::run(
         Settings::new("browser").icon("web-browser")
             .size(1024, 680)

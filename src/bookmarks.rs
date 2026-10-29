@@ -39,6 +39,36 @@ impl BookmarkStore {
         Self { items }
     }
 
+    pub fn load(path: &str) -> Self {
+        let Some(contents) = hxport::read_to_string(path) else {
+            return Self::new();
+        };
+        let items = contents.lines().filter_map(|line| {
+            let (title, url) = line.split_once('\t')?;
+            if url.is_empty() { None } else { Some(Bookmark::new(title, url)) }
+        }).collect();
+        Self { items }
+    }
+
+    pub fn save(&self, path: &str) {
+        let mut contents = String::new();
+        for item in &self.items {
+            let title = item.title.replace('\t', " ").replace('\n', " ").replace('\r', " ");
+            let url = item.url.replace('\t', "").replace('\n', "").replace('\r', "");
+            contents.push_str(&title);
+            contents.push('\t');
+            contents.push_str(&url);
+            contents.push('\n');
+        }
+        if let Some(parent) = path.rsplit_once('/') {
+            if let Some(grandparent) = parent.0.rsplit_once('/') {
+                let _ = hxport::mkdir(grandparent.0);
+            }
+            let _ = hxport::mkdir(parent.0);
+        }
+        let _ = hxport::write(path, contents.as_bytes());
+    }
+
     pub fn list(&self) -> &[Bookmark] {
         &self.items
     }

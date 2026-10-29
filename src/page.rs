@@ -180,6 +180,7 @@ fn fetch_curl(url: &str) -> Result<String, String> {
             "--show-error",
             "--fail",
             "--location",
+            "--ipv4",
             "--connect-timeout",
             "8",
             "--max-time",
@@ -221,6 +222,7 @@ fn fetch_curl(url: &str) -> Result<String, String> {
             "--show-error",
             "--fail",
             "--location",
+            "--ipv4",
             "--connect-timeout",
             "8",
             "--max-time",
@@ -271,6 +273,95 @@ fn fetch_socket(host: &str, port: u16, path: &str) -> Result<String, String> {
     }
 }
 
+#[cfg(target_os = "hamix")]
+fn fetch_https_openssl(url: &str) -> Result<String, String> {
+    let mut current = String::from(url);
+    for _ in 0..6 {
+        let Some(rest) = current.strip_prefix("https://") else {
+            return fetch_curl(&current);
+        };
+        let (authority, path) = rest.find('/').map(|i| (&rest[..i], &rest[i..])).unwrap_or((rest, "/"));
+        let (host, port) = authority.rsplit_once(':')
+            .and_then(|(host, port)| port.parse::<u16>().ok().map(|port| (host, port)))
+            .unwrap_or((authority, 443));
+        if host.is_empty() || host.contains('@') {
+            return Err(String::from("Invalid HTTPS address"));
+        }
+        let connect = format!("{}:{}", host, port);
+        let request = format!(
+            "GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: hxsurf/0.1.0\r\nAccept: text/html,text/plain,*/*\r\nAccept-Encoding: identity\r\nConnection: close\r\n\r\n",
+            path, authority
+        );
+        let args = [
+            "s_client", "-4", "-quiet", "-connect", connect.as_str(), "-servername", host,
+            "-verify_return_error", "-verify_hostname", host, "-CAfile", "/etc/ssl/certs/ca-certificates.crt",
+        ];
+        let mut child = hxport::spawn_piped("/usr/bin/openssl", &args, Some(&request))
+            .map_err(|e| format!("OpenSSL execution failed: {}", e))?;
+        let mut output = Vec::new();
+        let mut finished = false;
+        for _ in 0..3000 {
+            output.extend_from_slice(&child.read());
+            if child.try_wait().is_some() {
+                finished = true;
+                break;
+            }
+            hxstd::sys::sleep_ms(10);
+        }
+        if !finished {
+            let _ = hxport::kill(child.pid());
+            return Err(String::from("HTTPS request timed out"));
+        }
+        output.extend_from_slice(&child.read());
+        let response = String::from_utf8_lossy(&output).into_owned();
+        let Some(response_start) = response.find("HTTP/1.").or_else(|| response.find("HTTP/2")) else {
+            return Err(if response.is_empty() { String::from("OpenSSL returned no HTTPS response") } else { response });
+        };
+        let response = &response[response_start..];
+        let Some((headers, body)) = response.split_once("\r\n\r\n") else {
+            return Err(String::from("Malformed HTTPS response"));
+        };
+        let status = headers.lines().next().unwrap_or("");
+        if status.contains(" 301 ") || status.contains(" 302 ") || status.contains(" 303 ") || status.contains(" 307 ") || status.contains(" 308 ") {
+            let location = headers.lines().find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                if name.eq_ignore_ascii_case("location") { Some(value.trim()) } else { None }
+            }).ok_or_else(|| String::from("HTTPS redirect has no target"))?;
+            current = resolve_url(&current, location);
+            continue;
+        }
+        if !status.contains(" 200 ") {
+            return Err(format!("HTTPS server returned {}", status));
+        }
+        if headers.lines().any(|line| line.to_ascii_lowercase().starts_with("transfer-encoding:") && line.to_ascii_lowercase().contains("chunked")) {
+            return decode_chunked(body).ok_or_else(|| String::from("Invalid chunked HTTPS response"));
+        }
+        return Ok(String::from(body));
+    }
+    Err(String::from("Too many HTTPS redirects"))
+}
+
+#[cfg(target_os = "hamix")]
+fn decode_chunked(input: &str) -> Option<String> {
+    let mut output = Vec::new();
+    let mut remaining = input;
+    loop {
+        let line_end = remaining.find("\r\n")?;
+        let size_text = remaining[..line_end].split(';').next()?;
+        let size = usize::from_str_radix(size_text.trim(), 16).ok()?;
+        remaining = &remaining[line_end + 2..];
+        if size == 0 {
+            break;
+        }
+        if remaining.len() < size + 2 || &remaining[size..size + 2] != "\r\n" {
+            return None;
+        }
+        output.extend_from_slice(&remaining.as_bytes()[..size]);
+        remaining = &remaining[size + 2..];
+    }
+    Some(String::from_utf8_lossy(&output).into_owned())
+}
+
 #[cfg(not(target_os = "hamix"))]
 fn fetch_socket(host: &str, port: u16, path: &str) -> Result<String, String> {
     use std::io::{Read, Write};
@@ -290,15 +381,16 @@ fn fetch_socket(host: &str, port: u16, path: &str) -> Result<String, String> {
     }
 }
 
-fn fetch_network_content(url_string: &str) -> Result<String, String> {
-    let curl_result = fetch_curl(url_string);
-    let body = match curl_result {
+pub fn fetch_network_content(url_string: &str) -> Result<String, String> {
+    match fetch_curl(url_string) {
         Ok(body) => return Ok(body),
-        Err(err) => err,
-    };
-
-    if url_string.starts_with("https://") {
-        return Err(format!("Secure connection failed: {}", body));
+        Err(_curl_error) if url_string.starts_with("https://") => {
+            #[cfg(target_os = "hamix")]
+            return fetch_https_openssl(url_string).map_err(|openssl_error| format!("Secure connection failed: {}", openssl_error));
+            #[cfg(not(target_os = "hamix"))]
+            return Err(format!("Secure connection failed: {}", _curl_error));
+        }
+        Err(_) => {}
     }
 
     let without_scheme = if let Some(pos) = url_string.find("://") {
