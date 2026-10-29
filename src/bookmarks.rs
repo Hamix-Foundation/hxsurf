@@ -32,7 +32,7 @@ impl BookmarkStore {
     pub fn new() -> Self {
         let items = vec![
             Bookmark::new("HamixOS", "about:hamix"),
-            Bookmark::new("Documentation", "file:///usr/share/doc/hamix/index.html"),
+            Bookmark::new("Documentation", "about:help"),
             Bookmark::new("NetSurf Engine", "https://www.netsurf-browser.org/"),
             Bookmark::new("Search", "https://html.duckduckgo.com/html/"),
         ];

@@ -463,7 +463,7 @@ impl App for BrowserApp {
             .height(Length::Shrink);
             let tiles = column(vec![
                 row(vec![
-                    home_tile("HamixOS documentation", "System guides and help", "file:///usr/share/doc/hamix/index.html", "ui/file", chrome_border),
+                    home_tile("HamixOS documentation", "System guides and help", "about:help", "ui/file", chrome_border),
                     hspace(14).into(),
                     home_tile("Search the web", "Find pages with DuckDuckGo", "https://html.duckduckgo.com/html/", "ui/search", chrome_border),
                 ]).into(),
@@ -492,6 +492,8 @@ impl App for BrowserApp {
             container(divider()).bg(chrome_bg).height(Length::Shrink).into(),
             content_view.into(),
         ])
+        .width(Length::Fill)
+        .height(Length::Fill)
         .into()
     }
 

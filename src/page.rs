@@ -642,7 +642,7 @@ pub fn load_page(url: &str) -> Page {
                 PageNode::Heading(2, String::from("Quick Navigation")),
                 PageNode::Link {
                     text: String::from("HamixOS System Documentation"),
-                    url: String::from("file:///usr/share/doc/hamix/index.html"),
+                    url: String::from("about:help"),
                 },
                 PageNode::Link {
                     text: String::from("DuckDuckGo HTML Search"),
